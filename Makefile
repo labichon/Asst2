@@ -3,14 +3,18 @@ CFLAGS = -Wall
 
 all: detector
 
-detector:
-	$(CC) $(CFLAGS) Asst2.c -o detector
+detector: Asst2.c
+	$(CC) $(CFLAGS) Asst2.c -o detector -pthread
 
 # For debugging
 debug: CFLAGS = -Wall -g -fsanitize=address,undefined -D DEBUG=1
 debug: all
 
+ 
+testing: CFLAGS = -D DEBUG=1
+testing: all
+
 clean:
-	rm -f a.out Asst2 *.o
+	rm -f a.out detector Asst2 *.o
 
 
