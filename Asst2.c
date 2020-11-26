@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <string.h>
 #include <math.h>
+#include <fcntl.h>
 
 #ifndef DEBUG
 #define DEBUG 0
@@ -50,6 +51,23 @@ void joinThreads(threadNode *head) {
 	}
 }
 
+
+void *filehandle(void *args){
+	
+	char* fileName = (char*)args;
+	//printf("%s\n", fileName);
+	
+	int fd = open("fileName", O_RDONLY);
+	if (fd < 0) {
+		printf("error\n");
+		exit(EXIT_FAILURE);
+	}
+
+
+	close(fd);
+}
+
+
 void *directhandle(void *args){
 
 	// Create ease of use vars and open directory	
@@ -88,12 +106,13 @@ void *directhandle(void *args){
 		strcpy(pathName, dirName);
 		strcat(pathName, "/");
 		strcat(pathName, dp->d_name);
-		
+
 		if(dp->d_type == DT_REG){
 			// Found a regular file
 			if (DEBUG) printf("%s: Found regular file\n", 
 					   pathName);
 			// temp free
+			pthread_create(thread, NULL, filehandle, dp->d_name);
 			free(pathName);
 			free(toInsert->thread);
 			free(toInsert);
