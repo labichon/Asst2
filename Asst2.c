@@ -7,6 +7,10 @@
 #include <string.h>
 #include <math.h>
 #include <fcntl.h>
+#include <ctype.h>
+
+
+#define BUFSIZE 256
 
 #ifndef DEBUG
 #define DEBUG 0
@@ -52,19 +56,27 @@ void joinThreads(threadNode *head) {
 }
 
 
+//not understanding why open is stopping
+//everything else from happening
 void *filehandle(void *args){
 	
 	char* fileName = (char*)args;
-	//printf("%s\n", fileName);
-	
-	int fd = open("fileName", O_RDONLY);
+	printf("%s\n", fileName);
+	int fd = open("fileName", O_RDONLY); //everything after this doesn't print
+	printf("aids\n"); //doesn't print
 	if (fd < 0) {
 		printf("error\n");
 		exit(EXIT_FAILURE);
-	}
+	} 
+/*	
+	int d, bytes;
 
-
+	while (0 < (bytes = read(fd, &d, sizeof(int)))) {
+        	printf("Read %d bytes: %x\n", bytes, d);
+    	}
+*/
 	close(fd);
+	printf("aids2\n"); //doesn't print
 }
 
 
