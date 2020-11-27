@@ -182,12 +182,12 @@ void *filehandletest(void *args){
 
 int main(int argc, char *argv[]){
 	
-	
 	char* fileName = argv[1];
 	filehandle(fileName);
 	
 	/*
-	char *dirName = malloc(sizeof(strlen(argv[1])));
+	// Read in and copy the directory name
+	char *dirName = (char *) malloc(strlen(argv[1]) + 1);
 	strcpy(dirName, argv[1]);
 	DIR* dir = opendir(dirName);
 	void *rval; //return value
@@ -210,7 +210,6 @@ int main(int argc, char *argv[]){
 		return EXIT_FAILURE;
 	}
 	*/
-
 	return EXIT_SUCCESS;
 
 }
