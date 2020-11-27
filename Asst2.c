@@ -113,6 +113,10 @@ void *filehandle(void *args){
 					// Insert to DS and reset token list
 					printf("Token: %s\n", token);
 					// TODO: Insert into shared DS
+					
+					// reset the token ArrayList
+					size = INITIAL_TOKSIZE;
+					token = realloc(token, size);
 					used = 0;
 					reset = 0;
 				}
