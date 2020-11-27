@@ -11,6 +11,7 @@
 
 
 #define BUFSIZE 256
+#define INITIAL_TOKSIZE 16
 
 #ifndef DEBUG
 #define DEBUG 1
@@ -69,21 +70,59 @@ void *filehandle(void *args){
 	}
 
 	// Declare the buffer elements
-	char *buf = (char *) malloc(BUFSIZE);
+	char buf[BUFSIZE];
 	int bytes;
+	int size = INITIAL_TOKSIZE;
+
+	// Create arraylist and insert+reset booleans
+	char *token = malloc(size);
+	int used, insert, reset = 0;
 
 	while ((bytes = read(fd, buf, BUFSIZE)) > 0) {
 		// Read in up to BUFSIZE bytes
 		for (int pos = 0; pos < bytes; pos++) {
 			// Read in the characters one by one
-			printf("%c", buf[pos]);
-			//isspace(buf[pos]);
-			//isalpha(buf[pos]);
-			//tolower(buf[pos]);
+			
+			// Convert any alphabetic chars to lowercase
+			char curr = isalpha(buf[pos]) ? 
+				tolower(buf[pos]) : buf[pos];
+			
+			// Check type of character
+			if (isspace(curr) && used > 0) {
+				// Whitespace char that terminates a token:
+				// Insert the null terminator
+				curr = '\0';
+				insert = 1;
+				reset = 1;
+			} else if (isalpha(curr) || curr == '-') insert = 1;
+			
+			// If char is not a whitespace terminator, alphabetic, 
+			// or '-' char, ignore it
+
+			// Insert a char if needed
+			if (insert) {
+				// Insert char into arraylist
+				if (used == size) {
+					// Check size and realloc if not enough
+					size *= 2; // Multiply size by 2
+					token = realloc(token, size);
+				}
+				token[used++] = curr;
+				if (reset) {
+					// End of token:
+					// Insert to DS and reset token list
+					printf("Token: %s\n", token);
+					// TODO: Insert into shared DS
+					used = 0;
+					reset = 0;
+				}
+				insert = 0;
+			}
 		}
 	}
+	
+	free(token);
 
-	free(buf);
 	return NULL;
 
 }
