@@ -13,7 +13,7 @@
 #define BUFSIZE 256
 
 #ifndef DEBUG
-#define DEBUG 0
+#define DEBUG 1
 #endif
 
 // The ONLY reason there isn't a header file is because I'm not sure if they
@@ -61,22 +61,22 @@ void joinThreads(threadNode *head) {
 void *filehandle(void *args){
 	
 	char* fileName = (char*)args;
-	printf("%s\n", fileName);
-	int fd = open("fileName", O_RDONLY); //everything after this doesn't print
-	printf("aids\n"); //doesn't print
+	int fd = open(fileName, O_RDONLY);
 	if (fd < 0) {
-		printf("error\n");
+		perror(fileName);
 		exit(EXIT_FAILURE);
-	} 
-/*	
-	int d, bytes;
+	}
 
-	while (0 < (bytes = read(fd, &d, sizeof(int)))) {
-        	printf("Read %d bytes: %x\n", bytes, d);
-    	}
-*/
+	char *c = (char *) calloc(256, sizeof(char));
+	int size;
+
+	size = read(fd, c, 256);
+	c[size] = '\0';
+
+	printf("%s\n", c);
+
 	close(fd);
-	printf("aids2\n"); //doesn't print
+
 }
 
 
@@ -162,8 +162,31 @@ void *directhandle(void *args){
 	return NULL;	
 }
 
+/*
+void *filehandletest(void *args){
+	
+	char* fileName = (char*)args;
+	printf("%s\n", fileName);
+	int fd = open(fileName, O_RDONLY);
+        if (fd < 0) {
+                perror(fileName);
+                exit(EXIT_FAILURE);
+        }
+        char buf[256];
+
+        read(fd, &buf, 256);
+
+        printf("c = %s\n", buf);
+}*/
+
+
 int main(int argc, char *argv[]){
 	
+	
+	char* fileName = argv[1];
+	filehandle(fileName);
+	
+	/*
 	char *dirName = malloc(sizeof(strlen(argv[1])));
 	strcpy(dirName, argv[1]);
 	DIR* dir = opendir(dirName);
@@ -186,7 +209,7 @@ int main(int argc, char *argv[]){
 		printf("error\n");
 		return EXIT_FAILURE;
 	}
-	
+	*/
 
 	return EXIT_SUCCESS;
 
