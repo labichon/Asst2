@@ -60,22 +60,31 @@ void joinThreads(threadNode *head) {
 //everything else from happening
 void *filehandle(void *args){
 	
-	char* fileName = (char*)args;
+	// Open file
+	char* fileName = (char*)args; // FIXME: We will have more args later
 	int fd = open(fileName, O_RDONLY);
-	if (fd < 0) {
+	if (fd == -1) {
 		perror(fileName);
 		exit(EXIT_FAILURE);
 	}
 
-	char *c = (char *) calloc(256, sizeof(char));
-	int size;
+	// Declare the buffer elements
+	char *buf = (char *) malloc(BUFSIZE);
+	int bytes;
 
-	size = read(fd, c, 256);
-	c[size] = '\0';
+	while ((bytes = read(fd, buf, BUFSIZE)) > 0) {
+		// Read in up to BUFSIZE bytes
+		for (int pos = 0; pos < bytes; pos++) {
+			// Read in the characters one by one
+			printf("%c", buf[pos]);
+			//isspace(buf[pos]);
+			//isalpha(buf[pos]);
+			//tolower(buf[pos]);
+		}
+	}
 
-	printf("%s\n", c);
-
-	close(fd);
+	free(buf);
+	return NULL;
 
 }
 
