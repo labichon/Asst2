@@ -18,6 +18,15 @@
 #define DEBUG 0
 #endif
 
+// Define colors
+#define RED "\e[0;31m"
+#define YELLOW "\e[0;33m"
+#define GREEN "\e[0;32m"
+#define CYAN "\e[0;36m"
+#define BLUE "\e[0;34m"
+#define WHITE "\e[0;37m"
+#define RESET "\e[0m"
+
 // The ONLY reason there isn't a header file is because I'm not sure if they
 // are allowed :(
 
@@ -585,5 +594,4 @@ int main(int argc, char *argv[]){
 	}
 	
 	return EXIT_SUCCESS;
-
 }
