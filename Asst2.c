@@ -15,7 +15,7 @@
 #define HASHLEN 128
 
 #ifndef DEBUG
-#define DEBUG 1
+#define DEBUG 0
 #endif
 
 // The ONLY reason there isn't a header file is because I'm not sure if they
@@ -32,18 +32,29 @@ typedef struct threadNode {
 //directory
 
 typedef struct tokNode {
+	unsigned int frequency;
 	char* token;
-	int frequency;
 	struct tokNode *nextHash;
 	struct tokNode *nextLL;
 } tokNode;
 
+typedef struct fileNode {
+	unsigned long numTokens;
+	char *pathName;
+	tokNode *sortedTokens;
+	struct fileNode *next;
+} fileNode;
+
 //we need to pass a struct of info into the void function
 //im sure as we move further along, more stuff will be added
 typedef struct parameters {
-	char* directname;
+	char *directname;
+	fileNode **head;
+	pthread_mutex_t *lock;
 	// Insert shared data structure
 } parameters;
+
+
 
 // Join threads and free them
 void joinThreads(threadNode *head) {
@@ -125,24 +136,25 @@ void insertSortedLL(tokNode **head, tokNode *toInsert) {
 		toInsert->nextLL = curr;
 		*head = toInsert;
 	} else { // Insert to middle or end of LL
-		// Iterate to node before we want to insert
-		while (curr->nextLL != NULL && strcmp(curr->token, toInsert->token) < 0) {
+		// Iterate until the next node is null or greater than the current
+		while (curr->nextLL != NULL && 
+				strcmp(curr->nextLL->token, toInsert->token) < 0) {
 			curr = curr->nextLL;
 		}
 		// Insert node after current node
 		toInsert->nextLL = curr->nextLL;
 		curr->nextLL = toInsert;
 	}
-
 }
 
 void *filehandle(void *args){
 	
 	// Open file
-	char* fileName = (char*)args; // FIXME: We will have more args later
-	int fd = open(fileName, O_RDONLY);
+	char *pathName = ((parameters *)args)->directname;
+	if (DEBUG) printf("File Path: %s\n", pathName);
+	int fd = open(pathName, O_RDONLY);
 	if (fd == -1) {
-		perror(fileName);
+		perror(pathName);
 		exit(EXIT_FAILURE);
 	}
 
@@ -223,19 +235,35 @@ void *filehandle(void *args){
 	}
 
 	free(token);
-
-	if (DEBUG) printf("Num tokens: %lu\n", numTokens);
-	// TODO: Insert sorted LL into LL of files
-	
 	if (DEBUG) {
 		// Print linked list
 		printf("HEAD -> ");
 		for (tokNode *curr = sortedTokens; curr != NULL; curr=curr->nextLL) {
 			printf("(\"%s\", %d) -> ", curr->token, curr->frequency);
 		}
-		printf("\n");
-	
+		printf("\nNum tokens: %lu\n", numTokens);
 	}
+
+	// Insert sorted LL into LL of files	
+	fileNode **head = ((parameters *)args)->head;
+	pthread_mutex_t *lock = ((parameters *)args)->lock;
+
+	// Create fileNode to insert
+	fileNode *toInsert = (fileNode *) malloc(sizeof(fileNode));
+	toInsert->numTokens = numTokens;
+	toInsert->pathName = pathName;
+	toInsert->sortedTokens = sortedTokens;
+	
+
+	// Insert into front of LL
+	pthread_mutex_lock(lock);
+	toInsert->next = *head;
+	*head = toInsert;
+	pthread_mutex_unlock(lock);
+
+	// Insert node to front of linked list
+	free(args); //TODO: test before
+	
 
 	return NULL;
 }
@@ -280,31 +308,31 @@ void *directhandle(void *args){
 		strcat(pathName, "/");
 		strcat(pathName, dp->d_name);
 
+		parameters *arg = (parameters *)malloc(sizeof(parameters));
+		arg->directname = pathName;
+		arg->lock=((parameters *)args)->lock;
+		arg->head=((parameters *)args)->head;
+
+
 		if(dp->d_type == DT_REG){
 			// Found a regular file
 			if (DEBUG) printf("%s: Found regular file\n", 
 					   pathName);
-			// temp free
-			pthread_create(thread, NULL, filehandle, dp->d_name);
-			free(pathName);
-			free(toInsert->thread);
-			free(toInsert);
+
+			pthread_create(thread, NULL, filehandle, arg);
+			threadList = toInsert;
 		} else if(dp->d_type == DT_DIR){
 			// Found a directory
 			if (DEBUG) printf("%s: Found directory\n", pathName);
 		
-			// Create args to pass
-			parameters *args = (parameters *)malloc(sizeof(parameters));
-			args->directname = pathName;
-
-
 			// Create a pthread
-			pthread_create(thread, NULL, directhandle, (void *) args);
+			pthread_create(thread, NULL, directhandle, arg);
 			// Add pthread to LL
 			threadList = toInsert;
 		} else {
 			// Invalid type of file
 			printf("lol wut");
+			free(arg);
 			free(pathName);
 			free(toInsert->thread);
 			free(toInsert);
@@ -325,21 +353,18 @@ void *directhandle(void *args){
 
 int main(int argc, char *argv[]){
 	
-	char* fileName = argv[1];
-	filehandle(fileName);
-	
-	/*
 	// Read in and copy the directory name
 	size_t len = strlen(argv[1]);
+	char *dirPath = (char *) malloc(len + 1);
+	strcpy(dirPath, argv[1]);
+
 	// Check if last char is '/' and if so, remove it
-	if (argv[1][len-1] == '/') {
-		argv[1][len-1] = '\0';
-		len--;
+	if (dirPath[len-1] == '/') {
+		dirPath[--len] = '\0';
 	}
-	char *dirName = (char *) malloc(len + 1);
-	strcpy(dirName, argv[1]);
-	DIR* dir = opendir(dirName);
-	void *rval; //return value
+	
+	DIR* dir = opendir(dirPath);
+	//void *rval; //return value
 	
 	// TODO: Check if dir is valid + accessible
 
@@ -347,18 +372,56 @@ int main(int argc, char *argv[]){
 	//but also in the directory-handling function
 	//i put it the checking here for now
 	if (dir) {
-		struct parameters* argument = (struct parameters*) malloc(sizeof(struct parameters));
-		argument->directname = dirName;
-		pthread_t direct;
-		pthread_create(&direct, NULL, directhandle, argument);
-		pthread_join(direct, &rval);
-		printf("success\n");	
+		parameters* arg = (parameters*) malloc(sizeof(struct parameters));
+		
+		// Create LL of LLs and mutex
+		fileNode *head = NULL;
+        	pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+        	arg->head = &head;
+       		arg->lock = &lock;
+        	
+		// Add directory path to args
+
+		arg->directname = dirPath;
+		
+		// Create reference to the head pointer
+		fileNode **head_ref = &head;
+		
+		// Call the directory function
+		directhandle(arg);
+
+		// FIXME: Temporary debugging print statement
+		for (fileNode *c = *head_ref; c != NULL; c = c->next) {
+			printf("(Name: %s, Number of tokens: %lu) :", 
+					c->pathName, c->numTokens);
+                	for (tokNode *curr = c->sortedTokens; curr != NULL; curr=curr->nextLL) {
+                        	printf("(\"%s\", %d) -> ", curr->token, curr->frequency);
+                	}
+                	printf("\n\n\n");
+		}
+
+		// FIXME: Temporary debugging free statement
+		fileNode *temp; 
+		while (*head_ref != NULL) {
+			temp = *head_ref;
+			tokNode *curr = temp->sortedTokens;
+			while (curr != NULL) {
+				tokNode *temp = curr;
+				free(curr->token);
+				curr = curr->nextLL;
+				free(temp);
+			}
+			free(temp->pathName);
+			*head_ref = (*head_ref)->next;
+			free(temp);
+		}
+
 		closedir(dir);
 	} else if (ENOENT == errno) {
 		printf("error\n");
 		return EXIT_FAILURE;
 	}
-	*/
+	
 	return EXIT_SUCCESS;
 
 }
