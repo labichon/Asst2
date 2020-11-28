@@ -154,8 +154,9 @@ void *filehandle(void *args){
 	if (DEBUG) printf("File Path: %s\n", pathName);
 	int fd = open(pathName, O_RDONLY);
 	if (fd == -1) {
+		free(args);
 		perror(pathName);
-		exit(EXIT_FAILURE);
+		pthread_exit(NULL);
 	}
 
 	unsigned long numTokens = 0;
@@ -233,8 +234,10 @@ void *filehandle(void *args){
 			}
 		}
 	}
-
+	
+	close(fd);
 	free(token);
+
 	if (DEBUG) {
 		// Print linked list
 		printf("HEAD -> ");
@@ -261,8 +264,7 @@ void *filehandle(void *args){
 	*head = toInsert;
 	pthread_mutex_unlock(lock);
 
-	// Insert node to front of linked list
-	free(args); //TODO: test before
+	free(args);
 	
 
 	return NULL;
@@ -275,6 +277,15 @@ void *directhandle(void *args){
 	char *dirName = ((parameters *)args)->directname;
 	DIR* dir = opendir(dirName);
 	struct dirent *dp;
+
+	// Check if we can't open directory
+	if (errno != 0) {
+		free(((parameters *)args)->directname); // Free passed pathname
+		free(args); // Free passed args
+		perror(dirName);
+		pthread_exit(NULL);
+	}
+
 
 	// Create LL of directory and file threads
 	threadNode *threadList = NULL;
@@ -331,7 +342,7 @@ void *directhandle(void *args){
 			threadList = toInsert;
 		} else {
 			// Invalid type of file
-			printf("lol wut");
+			printf("%s: Invalid file type", pathName);
 			free(arg);
 			free(pathName);
 			free(toInsert->thread);
@@ -339,6 +350,7 @@ void *directhandle(void *args){
 		}
 
 	}
+	
 	closedir(dir);
 	
 	free(((parameters *)args)->directname); // Free parent's pathname
@@ -352,26 +364,27 @@ void *directhandle(void *args){
 }
 
 int main(int argc, char *argv[]){
-	
-	// Read in and copy the directory name
-	size_t len = strlen(argv[1]);
-	char *dirPath = (char *) malloc(len + 1);
-	strcpy(dirPath, argv[1]);
 
-	// Check if last char is '/' and if so, remove it
-	if (dirPath[len-1] == '/') {
-		dirPath[--len] = '\0';
+	DIR* dir = opendir(argv[1]);
+	// Check if dir is valid + accessible
+	if (errno != 0) {
+		perror(argv[1]);
+		exit(-1);
 	}
-	
-	DIR* dir = opendir(dirPath);
-	//void *rval; //return value
-	
-	// TODO: Check if dir is valid + accessible
 
 	//the assignment says to check a valid directory in the main,
 	//but also in the directory-handling function
 	//i put it the checking here for now
 	if (dir) {
+		size_t len = strlen(argv[1]);
+		char *dirPath = (char *) malloc(len + 1);
+		strcpy(dirPath, argv[1]);
+
+		// Check if last char is '/' and if so, remove it
+		if (dirPath[len-1] == '/') {
+			dirPath[--len] = '\0';
+		}
+
 		parameters* arg = (parameters*) malloc(sizeof(struct parameters));
 		
 		// Create LL of LLs and mutex
@@ -381,7 +394,6 @@ int main(int argc, char *argv[]){
        		arg->lock = &lock;
         	
 		// Add directory path to args
-
 		arg->directname = dirPath;
 		
 		// Create reference to the head pointer
@@ -399,6 +411,9 @@ int main(int argc, char *argv[]){
                 	}
                 	printf("\n\n\n");
 		}
+
+		// TODO: Check if fileNode LL is still null
+		// TODO: Math for all files
 
 		// FIXME: Temporary debugging free statement
 		fileNode *temp; 
