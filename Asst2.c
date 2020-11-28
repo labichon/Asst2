@@ -12,6 +12,7 @@
 
 #define BUFSIZE 256
 #define INITIAL_TOKSIZE 16
+#define HASHLEN 128
 
 #ifndef DEBUG
 #define DEBUG 1
@@ -30,11 +31,12 @@ typedef struct threadNode {
 //theres directory and a txt file in that
 //directory
 
-struct list {
+typedef struct tokNode {
 	char* token;
-	int prob;
-	struct list *next;
-};
+	int frequency;
+	struct tokNode *nextHash;
+	struct tokNode *nextLL;
+} tokNode;
 
 //we need to pass a struct of info into the void function
 //im sure as we move further along, more stuff will be added
@@ -56,9 +58,84 @@ void joinThreads(threadNode *head) {
 	}
 }
 
+//function to hash our values
+//First 10 chars
+int hash(char* key, int keyLen){
+        int x = 0;
+	int end = (keyLen < 10) ? keyLen : 10; // Make 10 a const
+        for(int i = 0; i < end; i++) x += key[i];
+        x = abs(x % HASHLEN);
+        return x;
+}
 
-//not understanding why open is stopping
-//everything else from happening
+//initialize HashMap
+void initHash(tokNode **HashMap){
+        for(int i = 0; i < HASHLEN; i++){
+                HashMap[i] = NULL;
+        }
+}
+
+/* HashMap Search
+ * Input: Hashmap (tokNode**) , token to insert (str), size of key (int)
+ * Output: NULL if not found, node found otherwise
+*/
+tokNode *searchHash(tokNode **HashMap, char *token, int len){
+        int i = hash(token, len);
+        if(HashMap[i] != NULL) {
+                for (tokNode *curr = HashMap[i]; curr != NULL; curr = curr->nextHash){
+			if (!strcmp(token, curr->token)) return curr;
+                }
+        }
+        return NULL;
+}
+
+/* Hashmap insert
+ * Input: HashMap (tokNode**), token to insert (str), len (int)
+ * Output: Pointer to node inserted or  NULL if already in list
+ * Note: 
+*/
+tokNode *insertHash(tokNode **HashMap, char *token, int len){
+        int i = hash(token, len);
+
+	// Check if token already in HashMap
+	tokNode *found = searchHash(HashMap, token, len);
+	if (found != NULL) {
+		(found->frequency)++;
+		return NULL;
+	}
+
+	// Create the new node
+	tokNode *newNode = (tokNode*) malloc(sizeof(tokNode));
+	
+	// Copy the token into the node
+	newNode->token = (char *) malloc(len+1);
+	strcpy(newNode->token, token);
+	newNode->frequency = 1;
+
+	// Insert node
+        newNode->nextHash = HashMap[i];
+        HashMap[i] = newNode;
+	return HashMap[i];
+}
+
+void insertSortedLL(tokNode **head, tokNode *toInsert) {
+	tokNode *curr = *head;
+	// Insert to front of LL (LL empty or node comes before head)
+	if (curr == NULL || strcmp(toInsert->token, curr->token) < 0) {
+		toInsert->nextLL = curr;
+		*head = toInsert;
+	} else { // Insert to middle or end of LL
+		// Iterate to node before we want to insert
+		while (curr->nextLL != NULL && strcmp(curr->token, toInsert->token) < 0) {
+			curr = curr->nextLL;
+		}
+		// Insert node after current node
+		toInsert->nextLL = curr->nextLL;
+		curr->nextLL = toInsert;
+	}
+
+}
+
 void *filehandle(void *args){
 	
 	// Open file
@@ -69,6 +146,8 @@ void *filehandle(void *args){
 		exit(EXIT_FAILURE);
 	}
 
+	unsigned long numTokens = 0;
+
 	// Declare the buffer elements
 	char buf[BUFSIZE];
 	int bytes;
@@ -76,16 +155,21 @@ void *filehandle(void *args){
 
 	// Create arraylist and insert+reset booleans
 	char *token = malloc(size);
-	int used, insert, reset = 0;
+	int used = 0, insert = 0, reset = 0;
+
+
+	// Create HashMap
+	tokNode *hashmap[HASHLEN];
+	initHash(hashmap);
+
+	// Create LinkedList (sorted)
+	tokNode *sortedTokens = NULL;
 
 	while ((bytes = read(fd, buf, BUFSIZE)) > 0) {
 		// Read in up to BUFSIZE bytes
-		for (int pos = 0; pos < bytes; pos++) {
-			// Read in the characters one by one
-			
+		for (int pos = 0; pos < bytes; pos++) { // Read chars individually
 			// Convert any alphabetic chars to lowercase
-			char curr = isalpha(buf[pos]) ? 
-				tolower(buf[pos]) : buf[pos];
+			char curr = isalpha(buf[pos]) ? tolower(buf[pos]) : buf[pos];
 			
 			// Check type of character
 			if (isspace(curr) && used > 0) {
@@ -111,9 +195,22 @@ void *filehandle(void *args){
 				if (reset) {
 					// End of token:
 					// Insert to DS and reset token list
-					printf("Token: %s\n", token);
-					// TODO: Insert into shared DS
+					if (DEBUG) printf("Inserting token: %s\n", token);
 					
+					
+
+					// Var used - 1 is equal to strlen(token)
+					// Insert into hashmap
+					tokNode *newNode = insertHash(hashmap, token, used-1);
+					
+					if (newNode != NULL) {
+						// Insert into sorted LL
+						insertSortedLL(&sortedTokens, newNode);
+						if (DEBUG) printf("Inserted (\"%s\", %d)\n", 
+							newNode->token, newNode->frequency);	
+					}
+
+					numTokens++;
 					// reset the token ArrayList
 					size = INITIAL_TOKSIZE;
 					token = realloc(token, size);
@@ -124,11 +221,23 @@ void *filehandle(void *args){
 			}
 		}
 	}
-	
+
 	free(token);
 
-	return NULL;
+	if (DEBUG) printf("Num tokens: %lu\n", numTokens);
+	// TODO: Insert sorted LL into LL of files
+	
+	if (DEBUG) {
+		// Print linked list
+		printf("HEAD -> ");
+		for (tokNode *curr = sortedTokens; curr != NULL; curr=curr->nextLL) {
+			printf("(\"%s\", %d) -> ", curr->token, curr->frequency);
+		}
+		printf("\n");
+	
+	}
 
+	return NULL;
 }
 
 
@@ -214,24 +323,6 @@ void *directhandle(void *args){
 	return NULL;	
 }
 
-/*
-void *filehandletest(void *args){
-	
-	char* fileName = (char*)args;
-	printf("%s\n", fileName);
-	int fd = open(fileName, O_RDONLY);
-        if (fd < 0) {
-                perror(fileName);
-                exit(EXIT_FAILURE);
-        }
-        char buf[256];
-
-        read(fd, &buf, 256);
-
-        printf("c = %s\n", buf);
-}*/
-
-
 int main(int argc, char *argv[]){
 	
 	char* fileName = argv[1];
@@ -239,7 +330,13 @@ int main(int argc, char *argv[]){
 	
 	/*
 	// Read in and copy the directory name
-	char *dirName = (char *) malloc(strlen(argv[1]) + 1);
+	size_t len = strlen(argv[1]);
+	// Check if last char is '/' and if so, remove it
+	if (argv[1][len-1] == '/') {
+		argv[1][len-1] = '\0';
+		len--;
+	}
+	char *dirName = (char *) malloc(len + 1);
 	strcpy(dirName, argv[1]);
 	DIR* dir = opendir(dirName);
 	void *rval; //return value
