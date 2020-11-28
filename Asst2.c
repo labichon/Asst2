@@ -18,15 +18,6 @@
 #define DEBUG 0
 #endif
 
-// Define colors
-#define RED "\e[0;31m"
-#define YELLOW "\e[0;33m"
-#define GREEN "\e[0;32m"
-#define CYAN "\e[0;36m"
-#define BLUE "\e[0;34m"
-#define WHITE "\e[0;37m"
-#define RESET "\e[0m"
-
 // The ONLY reason there isn't a header file is because I'm not sure if they
 // are allowed :(
 
@@ -43,6 +34,7 @@ typedef struct threadNode {
 typedef struct tokNode {
 	unsigned int frequency;
 	char* token;
+	float prob;
 	struct tokNode *nextHash;
 	struct tokNode *nextLL;
 } tokNode;
@@ -53,6 +45,12 @@ typedef struct fileNode {
 	tokNode *sortedTokens;
 	struct fileNode *next;
 } fileNode;
+
+typedef struct meanNode {
+	char* token;
+	float prob;
+	struct meanNode *next;
+} meanNode;
 
 //we need to pass a struct of info into the void function
 //im sure as we move further along, more stuff will be added
@@ -411,6 +409,7 @@ int main(int argc, char *argv[]){
 		// Call the directory function
 		directhandle(arg);
 
+		/*
 		// FIXME: Temporary debugging print statement
 		for (fileNode *c = *head_ref; c != NULL; c = c->next) {
 			printf("(Name: %s, Number of tokens: %lu) :", 
@@ -419,7 +418,30 @@ int main(int argc, char *argv[]){
                         	printf("(\"%s\", %d) -> ", curr->token, curr->frequency);
                 	}
                 	printf("\n\n\n");
+		}*/
+
+		for (fileNode *c = *head_ref; c != NULL; c = c->next) {
+			int numberOfTokens= c->numTokens;
+			float multiplier = 1 / ((float) numberOfTokens);
+			for (tokNode *curr = c->sortedTokens; curr != NULL; curr=curr->nextLL) {
+                        	curr->prob = curr->frequency * multiplier;
+			      	//printf("(\"%s\", %d, %f) -> ", curr->token, curr->frequency, curr->prob);
+                        	// everything above this works fine
+				//
+				// this needs work, I want to combine
+				// the tokens between the two linked lists
+				// in order to make a meanNode list, but I'm not sure
+				// if this is the best strategy
+				if(curr->nextLL != NULL) {
+                                	struct meanNode* meanList = (struct meanNode*)malloc(sizeof(struct meanNode));
+               				if(strcmp(curr->token, curr->nextLL->token) == 0) {
+                                        	printf("aids\n");
+                                	}
+                        	}
+			}
+			printf("\n\n\n");
 		}
+
 
 		// TODO: Check if fileNode LL is still null
 		// TODO: Math for all files
@@ -447,4 +469,5 @@ int main(int argc, char *argv[]){
 	}
 	
 	return EXIT_SUCCESS;
+
 }
