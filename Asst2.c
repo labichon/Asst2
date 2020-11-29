@@ -35,7 +35,6 @@ typedef struct threadNode {
 	struct threadNode *next;
 } threadNode;
 
-
 //there should be a test directory too
 //theres directory and a txt file in that
 //directory
@@ -54,12 +53,6 @@ typedef struct fileNode {
 	tokNode *sortedTokens;
 	struct fileNode *next;
 } fileNode;
-
-typedef struct meanNode {
-	char* token;
-	float prob;
-	struct meanNode *next;
-} meanNode;
 
 //we need to pass a struct of info into the void function
 //im sure as we move further along, more stuff will be added
@@ -228,8 +221,9 @@ void *filehandle(void *args){
 	if (DEBUG) printf("File Path: %s\n", pathName);
 	int fd = open(pathName, O_RDONLY);
 	if (fd == -1) {
-		free(args);
 		perror(pathName);
+		free(pathName);
+		free(args);
 		pthread_exit(NULL);
 	}
 
@@ -281,7 +275,6 @@ void *filehandle(void *args){
 				if (reset) {
 					// End of token:
 					// Insert to DS and reset token list
-					if (DEBUG) printf("Inserting token: %s\n", token);
 					
 					// Var used - 1 is equal to strlen(token)
 					// Insert into hashmap
@@ -290,8 +283,6 @@ void *filehandle(void *args){
 					if (newNode != NULL) {
 						// Insert into sorted LL
 						insertSortedLL(&sortedTokens, newNode);
-						if (DEBUG) printf("Inserted (\"%s\", %d)\n", 
-							newNode->token, newNode->frequency);	
 					}
 					numTokens++;
 					// reset the token ArrayList
@@ -306,15 +297,6 @@ void *filehandle(void *args){
 	}
 	close(fd);
 	free(token);
-
-	if (DEBUG) {
-		// Print linked list
-		printf("HEAD -> ");
-		for (tokNode *curr = sortedTokens; curr != NULL; curr=curr->nextLL) {
-			printf("(\"%s\", %d) -> ", curr->token, curr->frequency);
-		}
-		printf("\nNum tokens: %d\n", numTokens);
-	}
 
 	// Insert sorted LL into LL of files	
 	fileNode **head = ((parameters *)args)->head;
@@ -345,9 +327,9 @@ void *directhandle(void *args){
 
 	// Check if we can't open directory
 	if (errno != 0) {
+		perror(dirName);
 		free(((parameters *)args)->directname); // Free passed pathname
 		free(args); // Free passed args
-		perror(dirName);
 		pthread_exit(NULL);
 	}
 
@@ -560,6 +542,14 @@ int main(int argc, char *argv[]){
 				toInsert->jsd = jensonShannon(file1, file2);
 				filePairs[fileNum++] = toInsert;
 			}
+			// Free tokens
+			tokNode *curr = file1->sortedTokens;
+			while (curr != NULL) {
+				tokNode *temp = curr;
+				free(curr->token);
+				curr = curr->nextLL;
+				free(temp);
+			}
 		}
 
 		qsort(filePairs, totalPairs, sizeof(JSDNode *), sortCompareFunc);
@@ -575,13 +565,6 @@ int main(int argc, char *argv[]){
 		fileNode *temp; 
 		while (*head_ref != NULL) {
 			temp = *head_ref;
-			tokNode *curr = temp->sortedTokens;
-			while (curr != NULL) {
-				tokNode *temp = curr;
-				free(curr->token);
-				curr = curr->nextLL;
-				free(temp);
-			}
 			free(temp->pathName);
 			*head_ref = (*head_ref)->next;
 			free(temp);
