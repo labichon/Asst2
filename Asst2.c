@@ -32,7 +32,7 @@ typedef struct threadNode {
 //directory
 
 typedef struct tokNode {
-	unsigned int frequency;
+	int frequency;
 	char* token;
 	float prob;
 	struct tokNode *nextHash;
@@ -40,7 +40,7 @@ typedef struct tokNode {
 } tokNode;
 
 typedef struct fileNode {
-	unsigned long numTokens;
+	int numTokens;
 	char *pathName;
 	tokNode *sortedTokens;
 	struct fileNode *next;
@@ -154,6 +154,64 @@ void insertSortedLL(tokNode **head, tokNode *toInsert) {
 	}
 }
 
+// Compute Jenson-Shannon Distance of two files
+double jensonShannon(fileNode *file1, fileNode *file2) {
+	
+	// Assume fileNode pointers given are not NULL and
+	// have fields initialized
+	if (file1 == NULL || file2 == NULL) {
+		printf("ERROR: jensonShannon fileNodes assumed not NULL\n");
+		return -1;
+	}
+	
+	// Create kld sums (Kullbeck-Leibler Divergence)
+	double kld1 = 0, kld2 = 0;
+
+	tokNode *toks1 = file1->sortedTokens;
+	tokNode *toks2 = file2->sortedTokens;
+	
+	int comparison;
+
+	// Loop until both lists of tokens are done
+	while(toks1 != NULL && toks2 != NULL) {
+		// Compare the tokens to see which to are valid
+		// -1: Smallest token only present in left tokList
+		// 0: Smallest token present in both tokLists
+		// 1: Smallest token only present in right tokList
+		if (toks1 == NULL) comparison = 1;
+		else if (toks2 == NULL) comparison = -1;
+		else comparison = strcmp(toks1->token, toks2->token);
+		
+		// Initialize probability distributions to 0
+		double probDist1 = 0, probDist2 = 0, meanProb;
+
+		// Calculate probDist values and iterate lists appropriately
+		if (comparison <= 0) {
+			// Token present in first tokList
+			probDist1 = (double)(toks1->frequency) / (file1->numTokens);
+			toks1 = toks1->nextLL;
+		}
+		if (comparison >= 0) {
+			// Token present in second tokList
+			probDist2 = (double)(toks2->frequency) / (file2->numTokens);
+			toks2 = toks2->nextLL;
+		}
+
+		meanProb = (probDist1 + probDist2) / 2;
+
+		// Add to respective klds if necessary
+		if (comparison <= 0) kld1 += probDist1 * log10(probDist1 / meanProb);
+		if (comparison >= 0) kld2 += probDist2 * log10(probDist2 / meanProb);
+
+	}
+	printf("KLD1: %f\n", kld1);
+	printf("KLD2: %f\n", kld2);
+
+	if (DEBUG) printf("Computed KLD1 as %f and KLD2 as %f\n", kld1, kld2);
+
+	return (kld1 + kld2) / 2;
+}
+
 void *filehandle(void *args){
 	
 	// Open file
@@ -166,7 +224,7 @@ void *filehandle(void *args){
 		pthread_exit(NULL);
 	}
 
-	unsigned long numTokens = 0;
+	int numTokens = 0;
 
 	// Declare the buffer elements
 	char buf[BUFSIZE];
@@ -251,7 +309,7 @@ void *filehandle(void *args){
 		for (tokNode *curr = sortedTokens; curr != NULL; curr=curr->nextLL) {
 			printf("(\"%s\", %d) -> ", curr->token, curr->frequency);
 		}
-		printf("\nNum tokens: %lu\n", numTokens);
+		printf("\nNum tokens: %d\n", numTokens);
 	}
 
 	// Insert sorted LL into LL of files	
@@ -409,42 +467,26 @@ int main(int argc, char *argv[]){
 		// Call the directory function
 		directhandle(arg);
 
-		/*
+			
 		// FIXME: Temporary debugging print statement
 		for (fileNode *c = *head_ref; c != NULL; c = c->next) {
-			printf("(Name: %s, Number of tokens: %lu) :", 
+			printf("(Name: %s, Number of tokens: %d) :", 
 					c->pathName, c->numTokens);
                 	for (tokNode *curr = c->sortedTokens; curr != NULL; curr=curr->nextLL) {
                         	printf("(\"%s\", %d) -> ", curr->token, curr->frequency);
                 	}
                 	printf("\n\n\n");
-		}*/
-
-		for (fileNode *c = *head_ref; c != NULL; c = c->next) {
-			int numberOfTokens= c->numTokens;
-			float multiplier = 1 / ((float) numberOfTokens);
-			for (tokNode *curr = c->sortedTokens; curr != NULL; curr=curr->nextLL) {
-                        	curr->prob = curr->frequency * multiplier;
-			      	//printf("(\"%s\", %d, %f) -> ", curr->token, curr->frequency, curr->prob);
-                        	// everything above this works fine
-				//
-				// this needs work, I want to combine
-				// the tokens between the two linked lists
-				// in order to make a meanNode list, but I'm not sure
-				// if this is the best strategy
-				if(curr->nextLL != NULL) {
-                                	struct meanNode* meanList = (struct meanNode*)malloc(sizeof(struct meanNode));
-               				if(strcmp(curr->token, curr->nextLL->token) == 0) {
-                                        	printf("aids\n");
-                                	}
-                        	}
-			}
-			printf("\n\n\n");
 		}
 
-
-		// TODO: Check if fileNode LL is still null
 		// TODO: Math for all files
+		if (*head_ref == NULL) {
+			//TODO: Fix this error statement
+			printf("ERROR: Nothing was added");
+			exit(-1);
+		}
+
+		// Temporary test function (need to implement for all files)
+		printf("JS: %f\n", jensonShannon(*head_ref, (*head_ref)->next));
 
 		// FIXME: Temporary debugging free statement
 		fileNode *temp; 
