@@ -1,0 +1,19 @@
+1) Tested on a directory without permission to open
+
+2) Tested on an empty directory
+
+3) Tested on a directory containing 1 file
+
+4) Tested on a directory containing 2 files that were identical
+
+5) Tested on a directory containing 2 files that were somewhat different
+
+6) Tested on a directory containing a file that was empty and one that was not
+
+7) Tested on a directory containing two completely different files sharing no tokens
+
+8) Tested on a directory containing a file without permissions to open
+
+9) Tested on nested directories containing files
+
+10) Tested on parent directory containing all tests

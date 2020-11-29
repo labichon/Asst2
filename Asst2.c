@@ -516,7 +516,7 @@ int main(int argc, char *argv[]){
 		directhandle(arg);
 
 		if (*head_ref == NULL) {
-			printf("ERROR: Nothing was added\n");
+			printf("ERROR: No files were parsed and added\n");
 			exit(EXIT_FAILURE);
 		}
 
@@ -524,6 +524,11 @@ int main(int argc, char *argv[]){
 		
 		int numFiles = 0;
 		for (fileNode *file = *head_ref; file != NULL; file = file->next) numFiles++;
+
+		if (numFiles < 2) {
+			printf("ERROR: Not enough files to compare pairs (< 2 valid files)\n");
+			exit(EXIT_FAILURE);
+		}
 
 		// Since files are compared with all others, there are 
 		// summation(1 to n-1) pairs
