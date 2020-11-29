@@ -483,6 +483,17 @@ int sortCompareFunc(const void *val1, const void *val2) {
 	return retval;
 }
 
+void printJSD(double jsd) {
+	if (jsd < 0.1) printf(RED);
+	else if (jsd < 0.15) printf(YELLOW);
+	else if (jsd < 0.2) printf(GREEN);
+	else if (jsd < .25) printf(CYAN);
+	else if (jsd < .3) printf(BLUE);
+	else printf(WHITE);
+	printf("%f", jsd);
+	printf(RESET);
+}
+
 int main(int argc, char *argv[]){
 
 	DIR* dir = opendir(argv[1]);
@@ -528,17 +539,7 @@ int main(int argc, char *argv[]){
 		}
 
 		mergeSortLL(head_ref);
-			
-		// FIXME: Temporary debugging print statement
-		for (fileNode *c = *head_ref; c != NULL; c = c->next) {
-			printf("(Name: %s, Number of tokens: %d) :", 
-					c->pathName, c->numTokens);
-                	for (tokNode *curr = c->sortedTokens; curr != NULL; curr=curr->nextLL) {
-                        	printf("(\"%s\", %d) -> ", curr->token, curr->frequency);
-                	}
-                	printf("\n\n\n");
-		}
-
+		
 		int numFiles = 0;
 		for (fileNode *file = *head_ref; file != NULL; file = file->next) numFiles++;
 
@@ -564,10 +565,9 @@ int main(int argc, char *argv[]){
 		qsort(filePairs, totalPairs, sizeof(JSDNode *), sortCompareFunc);
 
 		for (int i = 0; i < totalPairs; i++) {
-			printf("%f", filePairs[i]->jsd);
-			printf(" \"%s\" and \"%s\" (%d)\n", filePairs[i]->file1->pathName,
-			       filePairs[i]->file2->pathName, 
-			       filePairs[i]->file1->numTokens + filePairs[i]->file2->numTokens);
+			printJSD(filePairs[i]->jsd);
+			printf(" \"%s\" and \"%s\"\n", filePairs[i]->file1->pathName,
+			       filePairs[i]->file2->pathName); 
 			free(filePairs[i]);
 		}
 
