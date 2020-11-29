@@ -173,7 +173,7 @@ double jensonShannon(fileNode *file1, fileNode *file2) {
 	int comparison;
 
 	// Loop until both lists of tokens are done
-	while(toks1 != NULL && toks2 != NULL) {
+	while(toks1 != NULL || toks2 != NULL) {
 		// Compare the tokens to see which to are valid
 		// -1: Smallest token only present in left tokList
 		// 0: Smallest token present in both tokLists
@@ -202,10 +202,7 @@ double jensonShannon(fileNode *file1, fileNode *file2) {
 		// Add to respective klds if necessary
 		if (comparison <= 0) kld1 += probDist1 * log10(probDist1 / meanProb);
 		if (comparison >= 0) kld2 += probDist2 * log10(probDist2 / meanProb);
-
 	}
-	printf("KLD1: %f\n", kld1);
-	printf("KLD2: %f\n", kld2);
 
 	if (DEBUG) printf("Computed KLD1 as %f and KLD2 as %f\n", kld1, kld2);
 
@@ -428,6 +425,57 @@ void *directhandle(void *args){
 	return NULL;	
 }
 
+void splitLL(fileNode *head, fileNode **left, fileNode **right) {
+	// Head is guaranteed to not be NULL
+	
+	fileNode *fast = head->next; // Start at 2nd node so we don't pass mid
+	fileNode *slow = head;
+
+	// Node fast travels at twice the speed of slow
+	// When fast reaches the end, slow is at the middle
+	while (fast != NULL && fast->next != NULL) {
+		slow = slow->next;
+		fast = fast->next->next;
+	}
+
+	// Slow is at or 1 before mid
+	*left = head;
+	*right = slow->next;
+	slow->next = NULL;
+}
+
+fileNode *merge(fileNode *left, fileNode *right) {
+	// Recursive merge
+	// Base cases
+	if (left == NULL) return right;
+	else if (right == NULL) return left;
+	
+	fileNode *ret;
+	if (left->numTokens < right->numTokens) {
+		left->next = merge(left->next, right);
+		ret = left;
+	} else {
+		right->next = merge(left, right->next);
+		ret = right;
+	}
+	return ret;
+}
+
+void mergeSortLL(fileNode **headRef) {
+
+	// Base Case: Length 0 or 1 - already sorted	
+	if (*headRef == NULL || (*headRef)->next == NULL) return;
+	
+	fileNode *left, *right;
+	splitLL(*headRef, &left, &right);
+
+	// Sort sublists then merge	
+	mergeSortLL(&left);
+	mergeSortLL(&right);
+	
+	*headRef = merge(left, right); 
+}
+
 int main(int argc, char *argv[]){
 
 	DIR* dir = opendir(argv[1]);
@@ -467,6 +515,13 @@ int main(int argc, char *argv[]){
 		// Call the directory function
 		directhandle(arg);
 
+		if (*head_ref == NULL) {
+			//TODO: Fix this error statement
+			printf("ERROR: Nothing was added\n");
+			exit(-1);
+		}
+
+		mergeSortLL(head_ref);
 			
 		// FIXME: Temporary debugging print statement
 		for (fileNode *c = *head_ref; c != NULL; c = c->next) {
@@ -479,10 +534,12 @@ int main(int argc, char *argv[]){
 		}
 
 		// TODO: Math for all files
-		if (*head_ref == NULL) {
-			//TODO: Fix this error statement
-			printf("ERROR: Nothing was added");
-			exit(-1);
+		for (fileNode *file1 = *head_ref; file1 != NULL; file1 = file1->next) {
+			for(fileNode *file2 = file1->next; file2 != NULL; file2 = file2->next) {
+				printf("%f: \"%s\" and \"%s\"\n", 
+						jensonShannon(file1, file2), file1->pathName,
+						file2->pathName);
+			}
 		}
 
 		// Temporary test function (need to implement for all files)
