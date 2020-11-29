@@ -58,10 +58,13 @@ typedef struct parameters {
 	char *directname;
 	fileNode **head;
 	pthread_mutex_t *lock;
-	// Insert shared data structure
 } parameters;
 
-
+typedef struct JSDNode {
+	double jsd; //Jenson Shannon Distance
+	fileNode *file1;
+	fileNode *file2;
+} JSDNode;
 
 // Join threads and free them
 void joinThreads(threadNode *head) {
@@ -232,7 +235,6 @@ void *filehandle(void *args){
 	char *token = malloc(size);
 	int used = 0, insert = 0, reset = 0;
 
-
 	// Create HashMap
 	tokNode *hashmap[HASHLEN];
 	initHash(hashmap);
@@ -272,8 +274,6 @@ void *filehandle(void *args){
 					// Insert to DS and reset token list
 					if (DEBUG) printf("Inserting token: %s\n", token);
 					
-					
-
 					// Var used - 1 is equal to strlen(token)
 					// Insert into hashmap
 					tokNode *newNode = insertHash(hashmap, token, used-1);
@@ -284,7 +284,6 @@ void *filehandle(void *args){
 						if (DEBUG) printf("Inserted (\"%s\", %d)\n", 
 							newNode->token, newNode->frequency);	
 					}
-
 					numTokens++;
 					// reset the token ArrayList
 					size = INITIAL_TOKSIZE;
@@ -296,7 +295,6 @@ void *filehandle(void *args){
 			}
 		}
 	}
-	
 	close(fd);
 	free(token);
 
@@ -319,7 +317,6 @@ void *filehandle(void *args){
 	toInsert->pathName = pathName;
 	toInsert->sortedTokens = sortedTokens;
 	
-
 	// Insert into front of LL
 	pthread_mutex_lock(lock);
 	toInsert->next = *head;
@@ -327,11 +324,8 @@ void *filehandle(void *args){
 	pthread_mutex_unlock(lock);
 
 	free(args);
-	
-
 	return NULL;
 }
-
 
 void *directhandle(void *args){
 
@@ -347,7 +341,6 @@ void *directhandle(void *args){
 		perror(dirName);
 		pthread_exit(NULL);
 	}
-
 
 	// Create LL of directory and file threads
 	threadNode *threadList = NULL;
@@ -386,11 +379,9 @@ void *directhandle(void *args){
 		arg->lock=((parameters *)args)->lock;
 		arg->head=((parameters *)args)->head;
 
-
 		if(dp->d_type == DT_REG){
 			// Found a regular file
-			if (DEBUG) printf("%s: Found regular file\n", 
-					   pathName);
+			if (DEBUG) printf("%s: Found regular file\n", pathName);
 
 			pthread_create(thread, NULL, filehandle, arg);
 			threadList = toInsert;
@@ -398,9 +389,7 @@ void *directhandle(void *args){
 			// Found a directory
 			if (DEBUG) printf("%s: Found directory\n", pathName);
 		
-			// Create a pthread
 			pthread_create(thread, NULL, directhandle, arg);
-			// Add pthread to LL
 			threadList = toInsert;
 		} else {
 			// Invalid type of file
@@ -411,8 +400,7 @@ void *directhandle(void *args){
 			free(toInsert);
 		}
 
-	}
-	
+	}	
 	closedir(dir);
 	
 	free(((parameters *)args)->directname); // Free parent's pathname
@@ -476,6 +464,16 @@ void mergeSortLL(fileNode **headRef) {
 	*headRef = merge(left, right); 
 }
 
+int sortCompareFunc(const void *val1, const void *val2) {
+	int sum1 = (*(JSDNode **)val1)->file1->numTokens + (*(JSDNode **)val1)->file2->numTokens;
+	int sum2 = (*(JSDNode **)val2)->file1->numTokens + (*(JSDNode **)val2)->file2->numTokens;
+	int retval;
+	if (sum1 < sum2) retval = -1;
+	else if (sum1 > sum2) retval = 1;
+	else retval = 0;
+	return retval;
+}
+
 int main(int argc, char *argv[]){
 
 	DIR* dir = opendir(argv[1]);
@@ -516,9 +514,8 @@ int main(int argc, char *argv[]){
 		directhandle(arg);
 
 		if (*head_ref == NULL) {
-			//TODO: Fix this error statement
 			printf("ERROR: Nothing was added\n");
-			exit(-1);
+			exit(EXIT_FAILURE);
 		}
 
 		mergeSortLL(head_ref);
@@ -533,19 +530,39 @@ int main(int argc, char *argv[]){
                 	printf("\n\n\n");
 		}
 
-		// TODO: Math for all files
+		int numFiles = 0;
+		for (fileNode *file = *head_ref; file != NULL; file = file->next) numFiles++;
+
+		// Since files are compared with all others, there are 
+		// summation(1 to n-1) pairs
+		int totalPairs = (numFiles * (numFiles - 1)) / 2;
+		JSDNode *filePairs[totalPairs];
+		int fileNum = 0;
+
+		// Compute all JSD
 		for (fileNode *file1 = *head_ref; file1 != NULL; file1 = file1->next) {
-			for(fileNode *file2 = file1->next; file2 != NULL; file2 = file2->next) {
-				printf("%f: \"%s\" and \"%s\"\n", 
-						jensonShannon(file1, file2), file1->pathName,
-						file2->pathName);
+			for(fileNode *file2 = file1->next; file2 != NULL; 
+			    file2 = file2->next) 
+			{
+				JSDNode *toInsert = malloc(sizeof(JSDNode));
+				toInsert->file1 = file1;
+				toInsert->file2 = file2;
+				toInsert->jsd = jensonShannon(file1, file2);
+				filePairs[fileNum++] = toInsert;
 			}
 		}
 
-		// Temporary test function (need to implement for all files)
-		printf("JS: %f\n", jensonShannon(*head_ref, (*head_ref)->next));
+		qsort(filePairs, totalPairs, sizeof(JSDNode *), sortCompareFunc);
 
-		// FIXME: Temporary debugging free statement
+		for (int i = 0; i < totalPairs; i++) {
+			printf("%f", filePairs[i]->jsd);
+			printf(" \"%s\" and \"%s\" (%d)\n", filePairs[i]->file1->pathName,
+			       filePairs[i]->file2->pathName, 
+			       filePairs[i]->file1->numTokens + filePairs[i]->file2->numTokens);
+			free(filePairs[i]);
+		}
+
+		// Free memory
 		fileNode *temp; 
 		while (*head_ref != NULL) {
 			temp = *head_ref;
