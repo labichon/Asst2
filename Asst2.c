@@ -225,7 +225,6 @@ double jensonShannon(fileNode *file1, fileNode *file2) {
 			probDist2 = (double)(toks2->frequency) / (file2->numTokens);
 			toks2 = toks2->nextLL;
 		}
-
 		meanProb = (probDist1 + probDist2) / 2;
 
 		// Add to respective klds if necessary
@@ -328,6 +327,26 @@ void *filehandle(void *args){
 				insert = 0;
 			}
 		}
+	}
+	if (used > 0) { // Insert last token
+		if (used == size) {
+			// Check size and realloc if not enough
+			size *= 2; // Multiply size by 2
+			token = realloc(token, size);
+		}
+		token[used++] = '\0';
+		// End of token:
+		// Insert to DS and reset token list
+
+		// Var used - 1 is equal to strlen(token)
+		// Insert into hashmap
+		tokNode *newNode = insertHash(hashmap, token, used-1);
+
+		if (newNode != NULL) {
+			// Insert into sorted LL
+			insertSortedLL(&sortedTokens, newNode);
+		}
+		numTokens++;
 	}
 	close(fd);
 	free(token);
@@ -550,6 +569,10 @@ void printJSD(double jsd) {
 
 
 int main(int argc, char *argv[]){
+
+	if (argc < 2) {
+		exit(-1);
+	}
 
 	// Store directory from command line
 	DIR* dir = opendir(argv[1]);
